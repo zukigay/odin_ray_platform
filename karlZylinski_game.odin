@@ -7,6 +7,7 @@ import "core:mem"
 import "core:fmt"
 import "core:encoding/json"
 import "core:os"
+import "core:math"
 
 Animation_Name :: enum {
     Idle,
@@ -139,10 +140,20 @@ main :: proc() {
 
     editing := false
 
+    phyFPS := f32(1.0/24.0)
+    // phyFPS := f32(1.0/165.0)
+    phyTime := f32(0.0)
+    player_interp_pos : rl.Vector2
+    phyAlpha : f32
+    phy_vel : rl.Vector2
+
 
 
 
     for !rl.WindowShouldClose() {
+        if !rl.IsKeyDown(.T) {
+            phyTime += rl.GetFrameTime()
+        }
 
         if rl.IsKeyDown(.LEFT) || rl.IsKeyDown(.A) {
             player_vel.x = -100
@@ -166,50 +177,83 @@ main :: proc() {
             // player_running = false
         }
 
-        player_vel.y += 1000 * rl.GetFrameTime()
 
         if rl.IsKeyPressed(.SPACE) && player_grounded {
             player_vel.y = -300
         }
 
-        player_pos += player_vel*rl.GetFrameTime()
+        for phyTime > phyFPS {
+            phy_vel = player_vel
+            player_vel.y += 1000 * phyFPS
 
-        player_feet_collider := rl.Rectangle {
-            player_pos.x -4,
-            player_pos.y -4,
-            8,
-            4,
-        }
-        player_grounded = false
+            player_pos += player_vel*phyFPS
 
-
-        for platform in level.platforms {
-            if rl.CheckCollisionRecs(player_feet_collider,platform_collider(platform)) && player_vel.y > 0 {
-                player_vel.y = 0
-                player_pos.y = platform.y
-                player_grounded = true
+            player_feet_collider := rl.Rectangle {
+                player_pos.x -4,
+                player_pos.y -4,
+                8,
+                4,
             }
+            player_grounded = false
 
+
+            for platform in level.platforms {
+                if rl.CheckCollisionRecs(player_feet_collider,platform_collider(platform)) && player_vel.y > 0 {
+                    player_vel.y = 0
+                    player_pos.y = platform.y
+                    player_grounded = true
+                }
+
+            }
+            phyTime -= phyFPS
         }
 
 
         update_animation(&currentAnim)
 
         screen_height := f32(rl.GetScreenHeight())
+        phyAlpha = phyTime / rl.GetFrameTime()
+
+        if player_grounded == true {
+            player_interp_pos = rl.Vector2 {
+                // player_pos.x + phyTime*player_vel.x,
+                player_pos.x + phyTime*phy_vel.x,
+                player_pos.y,
+            }
+        } else {
+            player_interp_pos = rl.Vector2 {
+                player_pos.x + phyTime*phy_vel.x,
+                player_pos.y + ((1000*phyTime)+player_vel.y)*phyTime,
+                // player_pos.y,
+            }
+            player_interp_feet_collider := rl.Rectangle {
+                player_interp_pos.x -4,
+                player_interp_pos.y -4,
+                8,
+                4,
+            }
+            for platform in level.platforms {
+                if rl.CheckCollisionRecs(player_interp_feet_collider,platform_collider(platform))  {
+                    player_interp_pos.y = platform.y
+                }
+            }
+        }
+        // player_interp_pos = rl.Vector2 {
+        //     player_pos.x,
+        //     player_pos.y,
+        // }
 
         camera := rl.Camera2D {
             zoom = screen_height/PixelWindowHeight,
             offset = {f32(rl.GetScreenWidth()/2),f32(rl.GetScreenHeight()/2)},
-            target = player_pos,
+            // target = player_pos,
+            target = player_interp_pos,
         }
 
 
         rl.BeginDrawing()
-        if rl.IsKeyDown(.T) {
-            s.sleep(1000000000)
-        }
         rl.BeginMode2D(camera)
-        draw_animation(currentAnim,player_pos,player_flip)
+        draw_animation(currentAnim,player_interp_pos,player_flip)
         // rl.DrawRectangleRec(player_feet_collider, {0,255,0,100})
         for platform in level.platforms {
             rl.DrawTextureV(platform_texture, platform, rl.WHITE)
