@@ -102,6 +102,7 @@ main :: proc() {
     player_vel: rl.Vector2
     player_grounded: bool
     player_flip: bool
+    player_gravity := f32(1000)
 
     // player_running: bool
 
@@ -184,7 +185,7 @@ main :: proc() {
 
         for phyTime > phyFPS {
             phy_vel = player_vel
-            player_vel.y += 1000 * phyFPS
+            player_vel.y += player_gravity * phyFPS
 
             player_pos += player_vel*phyFPS
 
@@ -223,7 +224,7 @@ main :: proc() {
         } else {
             player_interp_pos = rl.Vector2 {
                 player_pos.x + phyTime*phy_vel.x,
-                player_pos.y + ((1000*phyTime)+player_vel.y)*phyTime,
+                player_pos.y + ((player_gravity*phyTime)+player_vel.y)*phyTime,
                 // player_pos.y,
             }
             player_interp_feet_collider := rl.Rectangle {
