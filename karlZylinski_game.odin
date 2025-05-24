@@ -24,6 +24,10 @@ Animation :: struct {
     frame_length : f32,
     name: Animation_Name,
 }
+LevelItems :: enum {
+    platform,
+    smallPlatform,
+}
 
 update_animation :: proc(a: ^Animation) {
     a.frame_timer += rl.GetFrameTime()
@@ -69,6 +73,7 @@ PixelWindowHeight :: 180
 
 Level :: struct {
     platforms: [dynamic]rl.Vector2,
+    smallPlatforms: [dynamic]rl.Vector2,
 }
 
 platform_collider :: proc(pos: rl.Vector2) -> rl.Rectangle {
@@ -76,6 +81,26 @@ platform_collider :: proc(pos: rl.Vector2) -> rl.Rectangle {
         pos.x, pos.y,
         96,16
     }
+}
+platform_collider_small :: proc(pos: rl.Vector2) -> rl.Rectangle {
+    return {
+        pos.x, pos.y,
+        48,8
+    }
+}
+
+collidingGround :: proc(hitbox: rl.Rectangle,level: Level) -> (bool,rl.Vector2) {
+    for platform in level.platforms {
+        if rl.CheckCollisionRecs(hitbox,platform_collider(platform)) {
+            return true,platform
+        }
+    }
+    for platform in level.smallPlatforms {
+        if rl.CheckCollisionRecs(hitbox,platform_collider_small(platform)) {
+            return true,platform
+        }
+    }
+    return false,{0,0}
 }
 
 main :: proc() {
@@ -103,6 +128,7 @@ main :: proc() {
     player_grounded: bool
     player_flip: bool
     player_gravity := f32(1000)
+    // player_gravity := f32(1)
 
     // player_running: bool
 
@@ -123,6 +149,8 @@ main :: proc() {
     }
     currentAnim := player_idle
 
+    selectedEditItem : LevelItems
+
 
     level: Level
     //     platforms = {
@@ -136,6 +164,7 @@ main :: proc() {
             append(&level.platforms,rl.Vector2 {-20,20})
         }
     }
+    free_all(context.temp_allocator)
 
     platform_texture := rl.LoadTexture("platform.png")
 
@@ -198,14 +227,19 @@ main :: proc() {
             player_grounded = false
 
 
-            for platform in level.platforms {
-                if rl.CheckCollisionRecs(player_feet_collider,platform_collider(platform)) && player_vel.y > 0 {
+            if colliding, platform := collidingGround(player_feet_collider,level); colliding == true && player_vel.y > 0{
                     player_vel.y = 0
                     player_pos.y = platform.y
                     player_grounded = true
-                }
-
             }
+            // for platform in level.platforms {
+            //     if rl.CheckCollisionRecs(player_feet_collider,platform_collider(platform)) && player_vel.y > 0 {
+            //         player_vel.y = 0
+            //         player_pos.y = platform.y
+            //         player_grounded = true
+            //     }
+            //
+            // }
             phyTime -= phyFPS
         }
         }
@@ -234,10 +268,8 @@ main :: proc() {
                 8,
                 4,
             }
-            for platform in level.platforms {
-                if rl.CheckCollisionRecs(player_interp_feet_collider,platform_collider(platform))  {
-                    player_interp_pos.y = platform.y
-                }
+            if colliding, platform := collidingGround(player_interp_feet_collider,level); colliding == true && player_vel.y > 0{
+                player_interp_pos.y = platform.y
             }
         }
         // player_interp_pos = rl.Vector2 {
@@ -261,24 +293,52 @@ main :: proc() {
             rl.DrawTextureV(platform_texture, platform, rl.WHITE)
             // rl.DrawRectangleRec(platform, rl.RED)
         }
+        for platform in level.smallPlatforms {
+            // rl.DrawTextureV(platform_texture, platform, rl.WHITE)
+            rl.DrawRectangleRec(platform_collider_small(platform), rl.RED)
+        }
 
         if rl.IsKeyPressed(.ONE) {
             editing = !editing
         }
 
         if editing {
+            if rl.IsMouseButtonPressed(.MIDDLE) {
+                if selectedEditItem == .platform {
+                    selectedEditItem = .smallPlatform
+                } else {
+                    selectedEditItem = .platform
+                }
+            }
             mp := rl.GetScreenToWorld2D(rl.GetMousePosition(),camera)
 
-            rl.DrawTextureV(platform_texture, mp, rl.WHITE)
+            if selectedEditItem == .platform {
+                rl.DrawTextureV(platform_texture, mp, rl.WHITE)
+            } else if selectedEditItem == .smallPlatform {
+                rl.DrawRectangleRec(platform_collider_small(mp), rl.RED)
+            }
 
             if rl.IsMouseButtonPressed(.LEFT) {
-                append(&level.platforms, mp)
+                if selectedEditItem == .platform {
+                    append(&level.platforms, mp)
+                } else if selectedEditItem == .smallPlatform {
+                    append(&level.smallPlatforms, mp)
+                }
             }
             if rl.IsMouseButtonPressed(.RIGHT) {
-                for p, idx in level.platforms {
-                    if rl.CheckCollisionPointRec(mp, platform_collider(p) ) {
-                        unordered_remove(&level.platforms, idx)
-                        break
+                if selectedEditItem == .platform {
+                    for p, idx in level.platforms {
+                        if rl.CheckCollisionPointRec(mp, platform_collider(p) ) {
+                            unordered_remove(&level.platforms, idx)
+                            break
+                        }
+                    }
+                } else if selectedEditItem == .smallPlatform {
+                    for p, idx in level.smallPlatforms {
+                        if rl.CheckCollisionPointRec(mp, platform_collider(p) ) {
+                            unordered_remove(&level.smallPlatforms, idx)
+                            break
+                        }
                     }
                 }
             }
@@ -297,4 +357,5 @@ main :: proc() {
     free_all(context.temp_allocator)
 
     delete(level.platforms)
+    delete(level.smallPlatforms)
 }
