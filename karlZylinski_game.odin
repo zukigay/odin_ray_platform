@@ -152,9 +152,7 @@ main :: proc() {
 
 
     for !rl.WindowShouldClose() {
-        if !rl.IsKeyDown(.T) {
             phyTime += rl.GetFrameTime()
-        }
 
         if rl.IsKeyDown(.LEFT) || rl.IsKeyDown(.A) {
             player_vel.x = -100
@@ -183,6 +181,7 @@ main :: proc() {
             player_vel.y = -300
         }
 
+        if !rl.IsKeyDown(.T) {
         for phyTime > phyFPS {
             phy_vel = player_vel
             player_vel.y += player_gravity * phyFPS
@@ -207,6 +206,7 @@ main :: proc() {
 
             }
             phyTime -= phyFPS
+        }
         }
 
 
