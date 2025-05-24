@@ -179,6 +179,7 @@ main :: proc() {
 
         if rl.IsKeyPressed(.SPACE) && player_grounded {
             player_vel.y = -300
+            player_grounded = false
         }
 
         if !rl.IsKeyDown(.T) {
