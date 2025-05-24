@@ -1,4 +1,4 @@
-#+feature dynamic-literals
+// #+feature dynamic-literals
 package game
 
 import rl "vendor:raylib"
