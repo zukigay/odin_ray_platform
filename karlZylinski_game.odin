@@ -1,4 +1,4 @@
-// #+feature dynamic-literals
+#+feature dynamic-literals
 package game
 
 import rl "vendor:raylib"
@@ -8,6 +8,7 @@ import "core:fmt"
 import "core:encoding/json"
 import "core:os"
 import "core:math"
+import "core:strings"
 
 Animation_Name :: enum {
     Idle,
@@ -72,6 +73,7 @@ draw_animation :: proc(a: Animation, pos: rl.Vector2,flip: bool) {
 PixelWindowHeight :: 180
 
 Level :: struct {
+    // currentLevel: string,
     platforms: [dynamic]rl.Vector2,
     smallPlatforms: [dynamic]rl.Vector2,
 }
@@ -102,6 +104,35 @@ collidingGround :: proc(hitbox: rl.Rectangle,level: Level) -> (bool,rl.Vector2) 
     }
     return false,{0,0}
 }
+loadLevel :: proc(level: ^Level,currentLevel: string) -> bool {
+    delete(level.platforms)
+    delete(level.smallPlatforms)
+    // delete(level.currentLevel)
+
+    levelName := strings.concatenate({"level", currentLevel,  ".json"},context.temp_allocator)
+    if level_data, ok := os.read_entire_file(levelName,context.temp_allocator); ok {
+        // if json.unmarshal(level_data, &level) != nil {
+        if json.unmarshal(level_data, level) != nil {
+            append(&level.platforms,rl.Vector2 {-20,20})
+        } else {
+            return true
+        }
+    }
+    // delete(level.currentLevel)
+    // level.currentLevel = currentLevel
+    free_all(context.temp_allocator)
+    return false
+}
+saveLevel :: proc(level: Level,currentLevel: string) -> bool {
+    levelName := strings.concatenate({"level", currentLevel,  ".json"},context.temp_allocator)
+    if level_data, err := json.marshal(level,allocator = context.temp_allocator); err == nil {
+        os.write_entire_file(levelName,level_data)
+        fmt.print("saving... ",levelName)
+        return true
+    } 
+    return false
+}
+
 
 main :: proc() {
     track: mem.Tracking_Allocator
@@ -153,18 +184,16 @@ main :: proc() {
 
 
     level: Level
+    cLevel := "1"
+    loadLevel(&level,"1")
+    // level := Level {
+    //     levelid = 1,
     //     platforms = {
     //         {-20,20},
     //         {90,-10},
     //         {90,-50},
     //     },
     // }
-    if level_data, ok := os.read_entire_file("level.json",context.temp_allocator); ok {
-        if json.unmarshal(level_data, &level) != nil {
-            append(&level.platforms,rl.Vector2 {-20,20})
-        }
-    }
-    free_all(context.temp_allocator)
 
     platform_texture := rl.LoadTexture("platform.png")
 
@@ -174,7 +203,7 @@ main :: proc() {
     // phyFPS := f32(1.0/165.0)
     phyTime := f32(0.0)
     player_interp_pos : rl.Vector2
-    phyAlpha : f32
+    // phyAlpha : f32
     phy_vel : rl.Vector2
 
 
@@ -248,7 +277,7 @@ main :: proc() {
         update_animation(&currentAnim)
 
         screen_height := f32(rl.GetScreenHeight())
-        phyAlpha = phyTime / rl.GetFrameTime()
+        // phyAlpha = phyTime / rl.GetFrameTime()
 
         if player_grounded == true {
             player_interp_pos = rl.Vector2 {
@@ -298,18 +327,21 @@ main :: proc() {
             rl.DrawRectangleRec(platform_collider_small(platform), rl.RED)
         }
 
-        if rl.IsKeyPressed(.ONE) {
+        if rl.IsKeyPressed(.E) {
             editing = !editing
         }
 
         if editing {
-            if rl.IsMouseButtonPressed(.MIDDLE) {
-                if selectedEditItem == .platform {
-                    selectedEditItem = .smallPlatform
-                } else {
+            if rl.IsKeyDown(.ONE) {
                     selectedEditItem = .platform
-                }
             }
+            if rl.IsKeyDown(.TWO) {
+                    selectedEditItem = .smallPlatform
+            } 
+            if rl.IsKeyPressed(.G) {
+                saveLevel(level,cLevel)
+            }
+                
             mp := rl.GetScreenToWorld2D(rl.GetMousePosition(),camera)
 
             if selectedEditItem == .platform {
@@ -342,6 +374,16 @@ main :: proc() {
                     }
                 }
             }
+        } else {
+            if rl.IsKeyDown(.ONE) {
+                if loadLevel(&level,"1") {
+                    cLevel = "1"
+                }
+            } else if rl.IsKeyDown(.TWO) {
+                if loadLevel(&level,"2") {
+                    cLevel = "2"
+                }
+            } 
         }
         
 
@@ -351,11 +393,9 @@ main :: proc() {
     }
     rl.CloseWindow()
 
-    if level_data, err := json.marshal(level,allocator = context.temp_allocator); err == nil {
-        os.write_entire_file("level.json",level_data)
-    }
     free_all(context.temp_allocator)
 
     delete(level.platforms)
     delete(level.smallPlatforms)
+    // delete(level.currentLevel)
 }
